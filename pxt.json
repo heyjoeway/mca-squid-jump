@@ -2,7 +2,10 @@
     "name": "Squid Jump",
     "description": "",
     "dependencies": {
-        "device": "*"
+        "device": "*",
+        "arcade-sprite-data": "github:microsoft/arcade-sprite-data#v0.2.1",
+        "arcade-background-scroll": "github:microsoft/arcade-background-scroll#6cfbf925b9a4d5ddf3e1078e6cf6ca6a1aebb301",
+        "arcade-tile-util": "github:microsoft/arcade-tile-util#v1.0.1"
     },
     "files": [
         "main.blocks",
