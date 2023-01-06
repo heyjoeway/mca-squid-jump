@@ -9,25 +9,78 @@ function sfxWin () {
     })
 }
 
-function sfxBlowfish() {
+function sfxJellyfish() {
     timer.background(() => {
         music.playSoundEffect(music.createSoundEffect(WaveShape.Square, 2437, 2482, 74, 43, 100, SoundExpressionEffect.None, InterpolationCurve.Linear), SoundExpressionPlayMode.UntilDone);
     });
+}
+
+function sfxBlowfish() {
+    sfxJellyfish();
 
     timer.background(() => {
         music.playSoundEffect(music.createSoundEffect(WaveShape.Square, 208, 565, 255, 88, 500, SoundExpressionEffect.Vibrato, InterpolationCurve.Linear), SoundExpressionPlayMode.UntilDone)
     });
 }
 
-let tilemapCurrent = tilemap`level`
-tiles.setCurrentTilemap(tilemapCurrent)
-class ObjSquiddy {
-    defaultImg = assets.animation`squid`[0];
-    sprite: Sprite = null;
-    timeJumpStart = 0;
+class Obj {
     stopped = false;
 
     constructor() {
+        timer.background(() => {
+            while (!this.stopped) {
+                this.loop()
+                pause(16);
+            }
+        })
+    }
+
+    loop() { }
+    stop() { this.stopped = true; }
+}
+
+class ObjSparkle extends Obj {
+    player: ObjSquiddy = null;
+    sprite: Sprite = null;
+
+    constructor(player: ObjSquiddy) {
+        super();
+        this.player = player;
+        let anim = assets.animation`sparkle`;
+        this.sprite = sprites.create(
+            anim[0],
+            SpriteKind.Text
+        );
+        animation.runImageAnimation(
+            this.sprite,
+            anim,
+            200, // interval
+            true // loop
+        )
+    }
+
+    loop() {
+        let parent = this.player.sprite;
+        this.sprite.setPosition(parent.x, parent.y);
+        if (!this.player.canAirJump()) this.stop();
+    }
+
+    stop() {
+        super.stop();
+        this.sprite.destroy();
+    }
+}
+
+let tilemapCurrent = tilemap`level`
+tiles.setCurrentTilemap(tilemapCurrent)
+class ObjSquiddy extends Obj {
+    defaultImg = assets.animation`squid`[0];
+    sprite: Sprite = null;
+    timeJumpStart = 0;
+
+    constructor() {
+        super();
+
         this.sprite = sprites.create(this.defaultImg, SpriteKind.Player);
         this.sprite.setStayInScreen(false);
 
@@ -44,8 +97,6 @@ class ObjSquiddy {
             ControllerButtonEvent.Released,
             () => this.releaseJump()
         );
-
-        forever(() => this.loop());
     }
 
     startJump() {
@@ -60,6 +111,7 @@ class ObjSquiddy {
             );
             pause(1000);
             if (this.stopped) return;
+            if (this.timeJumpCharge() < 1000 - 16) return; // Give 1 frame leeway, just in case
             if (!controller.A.isPressed()) return;
             animation.runImageAnimation(
                 this.sprite,
@@ -71,6 +123,22 @@ class ObjSquiddy {
         this.timeJumpStart = game.runtime();
     }
 
+    airJumpTime = -Infinity;
+    airJumpTimeMax = 10 * 1000;
+
+    canAirJump() {
+        console.log(game.runtime() - this.airJumpTime);
+        return game.runtime() - this.airJumpTime < this.airJumpTimeMax
+    }
+
+    onGround() {
+        return this.sprite.isHittingTile(CollisionDirection.Bottom)
+    }
+
+    timeJumpCharge() {
+        return game.runtime() - this.timeJumpStart;
+    }
+
     releaseJump() {
         if (this.stopped) return;
 
@@ -80,14 +148,16 @@ class ObjSquiddy {
         );
         this.sprite.setImage(this.defaultImg)
 
-        // Need to be on ground
-        if (!this.sprite.isHittingTile(CollisionDirection.Bottom))
-            return;
+        // Need to be on ground (unless air jump active)
+        if (!this.canAirJump()) {
+            if (!this.onGround())
+                return;
+        }
 
         let jumpPowerMax = -250 // vy
         let jumpChargeTimeMax = 1000.0 // milliseconds
         let jumpPower = (Math.min(
-            game.runtime() - this.timeJumpStart,
+            this.timeJumpCharge(),
             jumpChargeTimeMax
         ) / jumpChargeTimeMax) * jumpPowerMax
         this.sprite.vy = Math.min(this.sprite.vy, jumpPower)
@@ -110,7 +180,7 @@ class ObjSquiddy {
     }
 
     stop() {
-        this.stopped = true;
+        super.stop();
         this.sprite.vx = 0;
         this.sprite.vy = 0;
         this.sprite.ax = 0;
@@ -139,9 +209,16 @@ class ObjSquiddy {
         });
     }
 
-    getBlowfish(tileLocation: tiles.Location) {
-        sfxBlowfish();
+    getJellyfish(tileLocation: tiles.Location) {
         tiles.setTileAt(tileLocation, assets.tile`blank`);
+        sfxJellyfish();
+        this.airJumpTime = game.runtime();
+        new ObjSparkle(this);
+    }
+
+    getBlowfish(tileLocation: tiles.Location) {
+        tiles.setTileAt(tileLocation, assets.tile`blank`);
+        sfxBlowfish();
         this.sprite.vy = -300;
     }
 
@@ -152,11 +229,11 @@ class ObjSquiddy {
             this.win();
         else if (tiles.tileAtLocationEquals(tileLocation, assets.tile`blowfish`))
             this.getBlowfish(tileLocation);
+        else if (tiles.tileAtLocationEquals(tileLocation, assets.tile`jellyfish`))
+            this.getJellyfish(tileLocation);
     }
 
     loop() {
-        if (this.stopped) return;
-
         if (this.sprite.vy < 0) {
             this.sprite.setFlag(SpriteFlag.GhostThroughWalls, true);
         } else {
