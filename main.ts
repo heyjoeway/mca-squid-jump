@@ -41,12 +41,23 @@ class ObjSquiddy {
     startJump() {
         if (this.stopped) return;
 
-        animation.runImageAnimation(
-            this.sprite,
-            assets.animation`squid`,
-            100,
-            false
-        )
+        timer.background(() => {
+            animation.runImageAnimation(
+                this.sprite,
+                assets.animation`squid`,
+                100,
+                false
+            );
+            pause(1000);
+            if (this.stopped) return;
+            if (!controller.A.isPressed()) return;
+            animation.runImageAnimation(
+                this.sprite,
+                assets.animation`squid-charged`,
+                80,
+                true
+            );
+        });
         this.timeJumpStart = game.runtime();
     }
 
