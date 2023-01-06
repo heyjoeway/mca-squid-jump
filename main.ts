@@ -3,12 +3,22 @@ function getBGPos () {
 }
 function sfxWin () {
     timer.background(function () {
-        music.playMelody("G5", 500)
-        music.playMelody("-", 500)
+        music.playMelody("G5 -", 500)
         music.playMelody("G5", 550)
         music.playMelody("C6", 150)
     })
 }
+
+function sfxBlowfish() {
+    timer.background(() => {
+        music.playSoundEffect(music.createSoundEffect(WaveShape.Square, 2437, 2482, 74, 43, 100, SoundExpressionEffect.None, InterpolationCurve.Linear), SoundExpressionPlayMode.UntilDone);
+    });
+
+    timer.background(() => {
+        music.playSoundEffect(music.createSoundEffect(WaveShape.Square, 208, 565, 255, 88, 500, SoundExpressionEffect.Vibrato, InterpolationCurve.Linear), SoundExpressionPlayMode.UntilDone)
+    });
+}
+
 let tilemapCurrent = tilemap`level`
 tiles.setCurrentTilemap(tilemapCurrent)
 class ObjSquiddy {
@@ -129,11 +139,19 @@ class ObjSquiddy {
         });
     }
 
+    getBlowfish(tileLocation: tiles.Location) {
+        sfxBlowfish();
+        tiles.setTileAt(tileLocation, assets.tile`blank`);
+        this.sprite.vy = -300;
+    }
+
     loopTiles() {
         let tileLocation = this.sprite.tilemapLocation();
 
         if (tiles.tileAtLocationEquals(tileLocation, assets.tile`zapfish`))
             this.win();
+        else if (tiles.tileAtLocationEquals(tileLocation, assets.tile`blowfish`))
+            this.getBlowfish(tileLocation);
     }
 
     loop() {
