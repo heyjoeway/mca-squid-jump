@@ -1,5 +1,4 @@
- 
-
+# its a tiny lil squid jump
 
 > Open this page at [https://heyjoeway.github.io/mca-squid-jump/](https://heyjoeway.github.io/mca-squid-jump/)
 
