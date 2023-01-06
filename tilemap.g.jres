@@ -34,6 +34,18 @@
         "tilemapTile": true,
         "displayName": "jellyfish"
     },
+    "tile6": {
+        "data": "hwQQABAAAAAAACACAAAAAgAAICIAACICAAAgRAIiIgIAAEJEJEQiAAAAQvEfRCQAACAU8R9BAgAAQkQREUQCACBERBRBRAIAIkRE8R9EJAAiRBTxH0EkAAAiRBERRCQAAABCREREJAIAAEJEJEIiAgAAIEQCICICAAAgIgAAAAIAACACAAAAAA==",
+        "mimeType": "image/x-mkcd-f4",
+        "tilemapTile": true,
+        "displayName": "starfish"
+    },
+    "tile7": {
+        "data": "hwQQABAAAABmZmYGAAAAABkRmWkAAAAAGZGZYQAAAAAZmRlpAAAAAJmZkWEAAAAAmRkZZgAAAACZkWFmAAAAAGZmZmYAAAAAZmZmBgAAAAAZEZlpAAAAABmRmWEAAAAAGZkZaQAAAACZmZFhAAAAAJkZGWYAAAAAmZFhZgAAAABmZmZmAAAAAA==",
+        "mimeType": "image/x-mkcd-f4",
+        "tilemapTile": true,
+        "displayName": "ice"
+    },
     "level2": {
         "id": "level2",
         "mimeType": "application/mkcd-tilemap",
