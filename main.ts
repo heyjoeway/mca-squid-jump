@@ -82,11 +82,10 @@ class Level {
             return tileProbability[tileProbability.length - 1].tile;
         }
 
-        let y = tilemapCurrent.height;
+        let y = tilemapCurrent.height - 6;
         // Create platforms
         // We leave a roughly square area around the zapfish
         while (y > tilemapCurrent.width) {
-            y -= randint(this.platformDistance[0], this.platformDistance[1]);
             let x = randint(0, tilemapCurrent.width - 1);
             let width = randint(this.platformWidth[0], this.platformWidth[1]);
             let tile = randomTile(this.tileProbability);
@@ -96,6 +95,7 @@ class Level {
                 tiles.setTileAt(tileLocation, tile);
                 tiles.setWallAt(tileLocation, true);
             }
+            y -= randint(this.platformDistance[0], this.platformDistance[1]);
         }
 
         this.itemCounts.forEach(item => {
@@ -499,7 +499,7 @@ class ObjSquiddy extends Obj {
         this.sprite.vy = Math.min(this.sprite.vy, jumpPower)
 
         music.playSoundEffect(
-            music.createSoundEffect(WaveShape.Square, 1902, 253, 88, 7, 250, SoundExpressionEffect.Tremolo, InterpolationCurve.Logarithmic),
+            music.createSoundEffect(WaveShape.Square, 313, 936, 0, 5, 100, SoundExpressionEffect.Tremolo, InterpolationCurve.Linear),
             SoundExpressionPlayMode.UntilDone
         );
     }
@@ -555,11 +555,16 @@ class ObjSquiddy extends Obj {
     }
 
     loop() {
+        // Top solid platforms
         if (this.sprite.vy < 0) {
             this.sprite.setFlag(SpriteFlag.GhostThroughWalls, true);
         } else {
             this.sprite.setFlag(SpriteFlag.GhostThroughWalls, false);
         }
+
+        // Keep in bounds
+        if (this.sprite.y < 0)
+            this.sprite.y = 0;
 
         let squiddyAcc = 100;
         if (this.sprite.isHittingTile(CollisionDirection.Bottom)) {
