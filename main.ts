@@ -16,6 +16,15 @@ function sfxBlowfish () {
         music.playSoundEffect(music.createSoundEffect(WaveShape.Square, 208, 565, 255, 88, 500, SoundExpressionEffect.Vibrato, InterpolationCurve.Linear), SoundExpressionPlayMode.UntilDone)
     })
 }
+
+function sfxMiss() {
+    timer.background(function () {
+        music.playSoundEffect(music.createSoundEffect(WaveShape.Sawtooth, 90, 46, 255, 255, 100, SoundExpressionEffect.Vibrato,InterpolationCurve.Logarithmic), SoundExpressionPlayMode.UntilDone)
+        pause(50);
+        music.playSoundEffect(music.createSoundEffect(WaveShape.Sawtooth, 90, 46, 255, 255, 200, SoundExpressionEffect.Vibrato,InterpolationCurve.Logarithmic), SoundExpressionPlayMode.UntilDone)
+    })
+}
+
 let tilemapCurrent: tiles.TileMapData = null
 class ForeverStopable {
     stopped = false;
@@ -31,14 +40,9 @@ class ForeverStopable {
 
     stop() { this.stopped = true; }
 }
-enum CleanupStatus {
-    NONE,
-    QUEUED,
-    DONE
-}
+
 class Obj {
     stopped = false;
-    _cleanupStatus: CleanupStatus = CleanupStatus.NONE;
     loopRunner: ForeverStopable = null;
 
     constructor() {
@@ -54,14 +58,9 @@ class Obj {
     }
     destroy() {
         this.stop();
-        // if (this._cleanupStatus == CleanupStatus.NONE)
-            // this._cleanupStatus = CleanupStatus.QUEUED;
-        // if (this._cleanupStatus == CleanupStatus.QUEUED)
-        return this._cleanup();
+        this._cleanup();
     }
-    _cleanup() {
-        // this._cleanupStatus = CleanupStatus.DONE;
-    }
+    _cleanup() { }
 }
 class ObjWater extends Obj {
     sprite: Sprite = null; 
@@ -147,6 +146,16 @@ class ObjSquiddy extends Obj {
         controller.A.onEvent(
             ControllerButtonEvent.Released,
             () => this.releaseJump()
+        );
+        sprites.onOverlap(
+            SpriteKind.Player,
+            SpriteKind.Enemy,
+            (sprite: Sprite, otherSprite: Sprite) => {
+                if (sprite != this.sprite) return;
+                if (this.stopped) return;
+                gameMode.stop();
+                new ObjMsgMiss();
+            }
         );
     }
 
@@ -247,8 +256,8 @@ class ObjSquiddy extends Obj {
     }
 
     win() {
-        this.stop();
-        new ObjWin();
+        gameMode.stop();
+        new ObjMsgWin();
     }
 
     getJellyfish(tileLocation: tiles.Location) {
@@ -307,46 +316,97 @@ class ObjSquiddy extends Obj {
     }
 }
 
-class ObjWin extends Obj {
-    bgSprite: Sprite = null;
-    textSprites: Sprite[] = [];
+class ObjMsgItem extends Obj{
+    x = 0;
+    y = 0;
+    text = "";
+    _textSprite: TextSprite = null;
+
+    constructor(x: number, y: number, text: string) {
+        super();
+        this.x = x;
+        this.y = y;
+        this.text = text;
+    }
+
+    draw() {
+        this._textSprite = textsprite.create(this.text);
+        this._textSprite.setFlag(SpriteFlag.RelativeToCamera, true);
+        this._textSprite.x = this.x + (screen.width / 2);
+        this._textSprite.y = this.y + (screen.height / 2);
+        this._textSprite.setMaxFontHeight(6);
+    }
+
+    _cleanup() {
+        super._cleanup();
+        this._textSprite.destroy();
+    }
+}
+
+class ObjMsg extends Obj {
+    items: ObjMsgItem[] = [];
+    pauseTime = 5000;
+
+    _bgSprite: Sprite = null;
+
+    init() { }
+    after() { }
 
     constructor() {
         super();
-        sfxWin();
+        this.init();
 
-        this.bgSprite = sprites.create(assets.image`winBg`, SpriteKind.Text);
-        this.bgSprite.x = screen.width / 2;
-        this.bgSprite.y = screen.height / 2;
-        this.bgSprite.setFlag(SpriteFlag.RelativeToCamera, true);
+        this._bgSprite = sprites.create(assets.image`msgBg`, SpriteKind.Text);
+        this._bgSprite.x = screen.width / 2;
+        this._bgSprite.y = screen.height / 2;
+        this._bgSprite.setFlag(SpriteFlag.RelativeToCamera, true);
 
-        let textItems = [
-            { x: 0, y: -12, text: "GOAL!" },
-            { x: 0, y: 0, text: "STAGE BONUS 300" },
-            { x: 0, y: 12, text: "TIME BONUS 100" }
-        ];
-
-        textItems.forEach(item => {
-            let textSprite = textsprite.create(item.text);
-            textSprite.setFlag(SpriteFlag.RelativeToCamera, true);
-            textSprite.x = item.x + (screen.width / 2);
-            textSprite.y = item.y + (screen.height / 2);
-            textSprite.setMaxFontHeight(6);
-            this.textSprites.push(textSprite);
-        });
+        this.items.forEach(item => item.draw());
 
         timer.background(() => {
-            pause(5000);
+            pause(this.pauseTime);
+            this.after();
             this.destroy();
-            gameMode.destroy();
-            gameMode = new ObjGameModeMain(tilemapCurrent);
         })
     }
 
     _cleanup() {
         super._cleanup();
-        this.bgSprite.destroy();
-        this.textSprites.forEach(x => x.destroy());
+        this._bgSprite.destroy();
+        this.items.forEach(item => item.destroy());
+    }
+}
+
+
+class ObjMsgWin extends ObjMsg {
+    init() {
+        this.pauseTime = 5000;
+        this.items = [
+            new ObjMsgItem(0, -12, "GOAL!"),
+            new ObjMsgItem(0, 0, "STAGE BONUS 300"),
+            new ObjMsgItem(0, 12, "TIME BONUS 100")
+        ];
+        sfxWin();
+    }
+
+    after() {
+        gameMode.destroy();
+        gameMode = new ObjGameModeMain(tilemapCurrent);
+    }
+}
+
+class ObjMsgMiss extends ObjMsg {
+    init() {
+        this.pauseTime = 1800;
+        this.items = [
+            new ObjMsgItem(0, 0, "MISS!"),
+        ];
+        sfxMiss();
+    }
+
+    after() {
+        gameMode.destroy();
+        gameMode = new ObjGameModeMain(tilemapCurrent);
     }
 }
 
@@ -371,6 +431,12 @@ class ObjGameModeMain extends Obj {
 
     loop() {
         scroller.setBackgroundScrollOffset(0, this.getBGPos())
+    }
+
+    stop() {
+        super.stop();
+        this.squiddy.stop();
+        this.water.stop();
     }
 
     _cleanup() {
