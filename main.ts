@@ -160,6 +160,12 @@ class ObjSquiddy extends Obj {
                 new ObjMsgMiss();
             }
         );
+
+        // Hack to fix camera jitter :)
+        game.currentScene().eventContext.registerFrameHandler(
+            15,
+            () => this.loopCamera()
+        );
     }
 
     time() {
@@ -315,7 +321,6 @@ class ObjSquiddy extends Obj {
             this.sprite.ax = 0;
 
         this.loopBounds();
-        this.loopCamera();
         this.loopTiles();
     }
 
@@ -443,6 +448,8 @@ function rightJustify(text: any, length: number, char: string) {
 class ObjHUD extends Obj {
     _bgSprite: Sprite = null;
     _timerSprite: TextSprite = null;
+    _scoreSprite: TextSprite = null;
+    _livesSprites: Sprite[] = [];
     sprites: Sprite[] = null;
     player: ObjSquiddy = null;
 
@@ -456,6 +463,22 @@ class ObjHUD extends Obj {
         this._timerSprite.setFlag(SpriteFlag.RelativeToCamera, true);
         this._timerSprite.x = 136;
         this._timerSprite.y = 116;
+
+        this._scoreSprite = textsprite.create("00000000", 0, 1);
+        this._scoreSprite.setFlag(SpriteFlag.RelativeToCamera, true);
+        this._scoreSprite.x = 24;
+        this._scoreSprite.y = 116;
+
+        let lives = 2;
+        let lifeWidth = 8;
+        let livesWidth = lives * lifeWidth;
+        for (let i = 0; i < 2; i++) {
+            let livesSprite = sprites.create(assets.image`life`, SpriteKind.Text);
+            livesSprite.setFlag(SpriteFlag.RelativeToCamera, true);
+            livesSprite.x = (screen.width / 2) + (livesWidth / 2) - (i * lifeWidth) - 3;
+            livesSprite.y = 116;
+            this._livesSprites.push(livesSprite);
+        }
     }
 
     loop() {
@@ -469,6 +492,15 @@ class ObjHUD extends Obj {
             rightJustify(centiseconds, 2, "0")
         );
         this._timerSprite.setText(timerText);
+
+        if (this.player.stopped) this.stop();
+    }
+
+    _cleanup() {
+        this._timerSprite.destroy();
+        this._scoreSprite.destroy();
+        this._livesSprites.forEach(x => x.destroy());
+
     }
 }
 
@@ -487,13 +519,19 @@ class ObjGameModeMain extends Obj {
         this.squiddy = new ObjSquiddy();
         this.water = new ObjWater();
         this.hud = new ObjHUD(this.squiddy);
+
+        // Hack to fix camera jitter :)
+        game.currentScene().eventContext.registerFrameHandler(
+            15,
+            () => this.loopBG()
+        );
     }
 
     getBGPos() {
         return 0 - scene.cameraProperty(CameraProperty.Y) + game.runtime() / 100
     }
 
-    loop() {
+    loopBG() {
         scroller.setBackgroundScrollOffset(0, this.getBGPos())
     }
 
