@@ -1,3 +1,11 @@
+let level = 1;
+let lives = 2;
+let score = 0;
+let hiscore = 0
+
+if (blockSettings.exists("hiscore")) 
+    hiscore = blockSettings.readNumber("hiscore");
+
 function sfxWin () {
     timer.background(function () {
         music.playMelody("G5 -", 500)
@@ -138,7 +146,7 @@ class ObjSquiddy extends Obj {
         this.sprite.setStayInScreen(false);
 
         this.sprite.ay = 225       
-        this.sprite.y = tilemapCurrent.height * 16 - 8
+        this.sprite.y = tilemapCurrent.height * 16 - 40
         this.sprite.x = 6 * 16;
 
         // Squid jump anim start
@@ -250,7 +258,7 @@ class ObjSquiddy extends Obj {
     }
 
     loopCamera() {
-        scene.centerCameraAt(6 * 16, this.sprite.y);
+        scene.centerCameraAt(6 * 16, this.sprite.y - 16);
     }
 
     loopBounds() {
@@ -270,7 +278,7 @@ class ObjSquiddy extends Obj {
 
     win() {
         gameMode.stop();
-        new ObjMsgWin();
+        new ObjMsgWin(this.time());
     }
 
     getJellyfish(tileLocation: tiles.Location) {
@@ -392,20 +400,73 @@ class ObjMsg extends Obj {
 }
 
 class ObjMsgWin extends ObjMsg {
+    stageBonus = 300;
+    timeBonus = 0;
+    time = 0;
+
+    constructor(time: number) {
+        super();
+    }
+
+    newScore() {
+        return score + this.stageBonus + this.timeBonus;
+    }
+
     init() {
+        let timeBonusMax = 500;
+        let timeBonusWidth = 16;
+        let timeBonusStart = 24;
+        this.timeBonus = Math.max(
+            0,
+            Math.min(
+                timeBonusMax,
+                (
+                    (
+                        timeBonusWidth +
+                        timeBonusStart -
+                        this.time
+                    ) / timeBonusWidth
+                ) * timeBonusMax
+            )
+        );
+
+        let newScore = this.newScore();
+        let hiscoreText = `HISCORE ${hiscore}`;
+
+        if (newScore > hiscore) {
+            hiscore = newScore;
+            blockSettings.writeNumber("hiscore", hiscore)
+            hiscoreText = "NEW HISCORE!";
+        }
+
         this.pauseTime = 5000;
         this.items = [
-            new ObjMsgItem(0, -12, "GOAL!"),
-            new ObjMsgItem(0, 0, "STAGE BONUS 300"),
-            new ObjMsgItem(0, 12, "TIME BONUS 100")
+            new ObjMsgItem(0, -24, "GOAL!"),
+            new ObjMsgItem(0, -12, `STAGE BONUS ${this.stageBonus}`),
+            new ObjMsgItem(0, 0, `TIME BONUS ${this.timeBonus}`),
+            new ObjMsgItem(0, 12, `TOTAL ${newScore}`),
+            new ObjMsgItem(0, 24, hiscoreText),
         ];
         sfxWin();
     }
 
     after() {
+        score = this.newScore();
+        level++;
         gameMode.destroy();
         gameMode = new ObjGameModeMain(tilemapCurrent);
     }
+}
+
+class ObjMsgGameOver extends ObjMsg {
+    init() {
+        this.pauseTime = 5000;
+        this.items = [
+            new ObjMsgItem(0, 0, "GAME OVER!"),
+        ];
+    }
+
+    after() { game.reset(); }
 }
 
 class ObjMsgMiss extends ObjMsg {
@@ -418,6 +479,12 @@ class ObjMsgMiss extends ObjMsg {
     }
 
     after() {
+        if (lives == 0) {
+            new ObjMsgGameOver();
+            return;
+        }
+        
+        lives--;
         gameMode.destroy();
         gameMode = new ObjGameModeMain(tilemapCurrent);
     }
@@ -440,9 +507,12 @@ function repeatChar(count: number, ch: string) {
 }
 
 function rightJustify(text: any, length: number, char: string) {
+    if (text == 0)
+        return repeatChar(length, char)
+
     let paddingLength = length - convertToText(text).length;
     let padding = repeatChar(paddingLength, char);
-    return padding + text;
+    return padding + convertToText(text);
 }
 
 class ObjHUD extends Obj {
@@ -450,6 +520,7 @@ class ObjHUD extends Obj {
     _timerSprite: TextSprite = null;
     _scoreSprite: TextSprite = null;
     _livesSprites: Sprite[] = [];
+    _levelSprite: TextSprite = null;
     sprites: Sprite[] = null;
     player: ObjSquiddy = null;
 
@@ -464,15 +535,27 @@ class ObjHUD extends Obj {
         this._timerSprite.x = 136;
         this._timerSprite.y = 116;
 
-        this._scoreSprite = textsprite.create("00000000", 0, 1);
-        this._scoreSprite.setFlag(SpriteFlag.RelativeToCamera, true);
-        this._scoreSprite.x = 24;
-        this._scoreSprite.y = 116;
+        this._levelSprite = textsprite.create(`LEVEL ${level}`, 0, 1);
+        this._levelSprite.setFlag(SpriteFlag.RelativeToCamera, true);
+        this._levelSprite.x = 22;
+        this._levelSprite.y = 116;
 
-        let lives = 2;
+        timer.background(() => {
+            pause(2000);
+            this._levelSprite.destroy();
+
+            this._scoreSprite = textsprite.create(
+                rightJustify(score, 8, "0"),
+                0, 1
+            );
+            this._scoreSprite.setFlag(SpriteFlag.RelativeToCamera, true);
+            this._scoreSprite.x = 24;
+            this._scoreSprite.y = 116;
+        });
+
         let lifeWidth = 8;
         let livesWidth = lives * lifeWidth;
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < lives; i++) {
             let livesSprite = sprites.create(assets.image`life`, SpriteKind.Text);
             livesSprite.setFlag(SpriteFlag.RelativeToCamera, true);
             livesSprite.x = (screen.width / 2) + (livesWidth / 2) - (i * lifeWidth) - 3;
@@ -500,7 +583,6 @@ class ObjHUD extends Obj {
         this._timerSprite.destroy();
         this._scoreSprite.destroy();
         this._livesSprites.forEach(x => x.destroy());
-
     }
 }
 
@@ -515,7 +597,11 @@ class ObjGameModeMain extends Obj {
         
         tilemapCurrent = helpers.getTilemapByName(tilemapCurrentName);
         tiles.setCurrentTilemap(tilemapCurrent);
-        scene.setBackgroundImage(assets.image`bg`);
+        scene.setBackgroundColor(8);
+        scroller.setLayerImage(
+            scroller.BackgroundLayer.Layer0,
+            assets.image`bg`
+        )
         this.squiddy = new ObjSquiddy();
         this.water = new ObjWater();
         this.hud = new ObjHUD(this.squiddy);
