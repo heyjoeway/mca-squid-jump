@@ -19,42 +19,56 @@ function sfxMiss () {
 }
 
 class Level {
+    bgHue: number = null;
     platformDistance: Array<number> = null;
     platformWidth: Array<number> = null;
     tileProbability: Array<any> = null;
-    bgHue: number = null;
+    itemCounts: Array<any> = null;
 
     constructor(
         platformDistance: Array<number>,
         platformWidth: Array<number>,
         tileProbability: Array<any>,
-        bgHue: number,
+        itemCounts: Array<any>,
+        bgHue: number = null
     ) {
         this.platformDistance = platformDistance;
         this.platformWidth = platformWidth;
         this.tileProbability = tileProbability;
         this.bgHue = bgHue;
+        this.itemCounts = itemCounts;
     }
 
     generate() {
+        // Seed RNG with level id to get consistent generations
+        let rng = new Math.FastRandom(level * 1000);
+        // Waste RNG (seems to have distribution issues?)
+        for (let i = 0; i < level * 2; i++)
+            rng.next();
+
+        // Redefine randint to use seeded rng
+        let randint = function (min: number, max: number) {
+            return Math.round(rng.randomRange(min, max));
+        }
+
+        let bgHue = this.bgHue;
+        console.log(bgHue)
+        if (bgHue == null) {
+            bgHue = (rng.next() / 0xFFFF) * 360;
+        }
+        console.log(bgHue)
+
+
         let colorBG = color.HSL.fromHexValue(0x2F3169);
-        colorBG.hue = this.bgHue;
+        colorBG.hue = bgHue;
         let colorStars = color.HSL.fromHexValue(0x6B5394);
-        colorStars.hue = this.bgHue;
+        colorStars.hue = bgHue;
 
         color.setColor(8, colorBG.hexValue());
         color.setColor(11, colorStars.hexValue());
 
         tilemapCurrent = tilemap`level`;
         tiles.setTilemap(tilemapCurrent);
-
-        // Seed RNG with level id to get consistent generations
-        let rng = new Math.FastRandom(level);
-
-        // Redefine randint to use seeded rng
-        function randint(min: number, max: number) {
-            return Math.round(rng.randomRange(min, max));
-        }
 
         function randomTile(tileProbability: Array<any>) {
             let value = rng.randomRange(0, 100) / 100.0;
@@ -68,7 +82,8 @@ class Level {
             return tileProbability[tileProbability.length - 1].tile;
         }
 
-        let y = tilemapCurrent.height - 4;
+        let y = tilemapCurrent.height;
+        // Create platforms
         // We leave a roughly square area around the zapfish
         while (y > tilemapCurrent.width) {
             y -= randint(this.platformDistance[0], this.platformDistance[1]);
@@ -82,32 +97,162 @@ class Level {
                 tiles.setWallAt(tileLocation, true);
             }
         }
+
+        this.itemCounts.forEach(item => {
+            let count = item.count;
+            while (count > 0) {
+                let tileLocation = tiles.getTileLocation(
+                    randint(2, 10),
+                    randint(tilemapCurrent.width, tilemapCurrent.height)
+                );
+                if (tiles.tileAtLocationIsWall(tileLocation))
+                    continue;
+                tiles.setTileAt(tileLocation, item.tile)
+                count -= 1;
+            }
+        });
     }
 }
 
+let level = 1
+
+let levelDataFirst = new Level(
+    [4, 6],
+    [4, 6],
+    [{
+        tile: assets.tile`ground`,
+        probability: 1
+    }],
+    [],
+    238
+);
+
+let levelData1 = new Level(
+    [4, 8],
+    [4, 6],
+    [{
+        tile: assets.tile`ground`,
+        probability: 1
+    }],
+    [{
+        tile: assets.tile`blowfish`,
+        count: 5
+    }]
+);
+
+let levelData2 = new Level(
+    [4, 8],
+    [4, 5],
+    [{
+        tile: assets.tile`ground`,
+        probability: 1
+    }],
+    [{
+        tile: assets.tile`blowfish`,
+        count: 5
+    }]
+);
+
+let levelData3 = new Level(
+    [6, 8],
+    [3, 4],
+    [{
+        tile: assets.tile`ground`,
+        probability: 0.75
+    },{
+        tile: assets.tile`ice`,
+        probability: 0.25
+    }],
+    [{
+        tile: assets.tile`jellyfish`,
+        count: 5
+    }]
+);
+
+let levelData4 = new Level(
+    [6, 8],
+    [3, 4],
+    [{
+        tile: assets.tile`ground`,
+        probability: 0.5
+    }, {
+        tile: assets.tile`ice`,
+        probability: 0.5
+    }],
+    [{
+        tile: assets.tile`blowfish`,
+        count: 3
+    },{
+        tile: assets.tile`jellyfish`,
+        count: 2
+    }]
+);
+
+let levelData5 = new Level(
+    [6, 8],
+    [3, 4],
+    [{
+        tile: assets.tile`ice`,
+        probability: 1
+    }],
+    [{
+        tile: assets.tile`jellyfish`,
+        count: 5
+    }]
+);
+
+let levelData6 = new Level(
+    [6, 8],
+    [2, 3],
+    [{
+        tile: assets.tile`ice`,
+        probability: 1
+    }],
+    [{
+        tile: assets.tile`blowfish`,
+        count: 3
+    },{
+        tile: assets.tile`jellyfish`,
+        count: 2
+    }]
+);
+
+
+let levelData7 = new Level(
+    [7, 8],
+    [2, 3],
+    [{
+        tile: assets.tile`ground`,
+        probability: 0.25
+    }, {
+        tile: assets.tile`ice`,
+        probability: 0.75
+    }],
+    [{
+        tile: assets.tile`blowfish`,
+        count: 3
+    }, {
+        tile: assets.tile`jellyfish`,
+        count: 2
+    }]
+);
+
 let levelData = [
-    new Level( // 1
-        [4, 8],
-        [2, 6],
-        [
-            {
-                tile: assets.tile`ground`,
-                probability: 1
-            }
-        ],
-        238
-    ),
-    new Level( // 2
-        [6, 8],
-        [2, 3],
-        [
-            {
-                tile: assets.tile`ice`,
-                probability: 1
-            }
-        ],
-        220
-    )
+    levelDataFirst,
+    levelData1,
+    levelData1,
+    levelData2,
+    levelData2,
+    levelData3,
+    levelData3,
+    levelData4,
+    levelData4,
+    levelData5,
+    levelData5,
+    levelData6,
+    levelData6,
+    levelData7,
+    levelData7
 ];
 
 function sfxBlowfish () {
@@ -133,7 +278,6 @@ let tileset: Image[] = []
 let tilemapCurrent: tiles.TileMapData = null
 let hiscore = 0
 let score = 0
-let level = 1
 let lives = 2
 if (blockSettings.exists("hiscore")) {
     hiscore = blockSettings.readNumber("hiscore")
@@ -674,7 +818,7 @@ class ObjGameModeMain extends Obj {
     constructor(tilemap: tiles.TileMapData) {
         super();
         
-        levelData[level-1].generate();
+        levelData[Math.min(level-1,levelData.length-1)].generate();
         scene.setBackgroundColor(8);
         scroller.setLayerImage(
             scroller.BackgroundLayer.Layer0,
