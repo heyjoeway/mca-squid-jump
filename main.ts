@@ -1,11 +1,3 @@
-let level = 1;
-let lives = 2;
-let score = 0;
-let hiscore = 0
-
-if (blockSettings.exists("hiscore")) 
-    hiscore = blockSettings.readNumber("hiscore");
-
 function sfxWin () {
     timer.background(function () {
         music.playMelody("G5 -", 500)
@@ -18,22 +10,134 @@ function sfxJellyfish () {
         music.playSoundEffect(music.createSoundEffect(WaveShape.Square, 2437, 2482, 74, 43, 100, SoundExpressionEffect.None, InterpolationCurve.Linear), SoundExpressionPlayMode.UntilDone)
     })
 }
+function sfxMiss () {
+    timer.background(function () {
+        music.playSoundEffect(music.createSoundEffect(WaveShape.Sawtooth, 90, 46, 255, 255, 100, SoundExpressionEffect.Vibrato, InterpolationCurve.Logarithmic), SoundExpressionPlayMode.UntilDone)
+        pause(50)
+        music.playSoundEffect(music.createSoundEffect(WaveShape.Sawtooth, 90, 46, 255, 255, 200, SoundExpressionEffect.Vibrato, InterpolationCurve.Logarithmic), SoundExpressionPlayMode.UntilDone)
+    })
+}
+
+class Level {
+    platformDistance: Array<number> = null;
+    platformWidth: Array<number> = null;
+    tileProbability: Array<any> = null;
+    bgHue: number = null;
+
+    constructor(
+        platformDistance: Array<number>,
+        platformWidth: Array<number>,
+        tileProbability: Array<any>,
+        bgHue: number,
+    ) {
+        this.platformDistance = platformDistance;
+        this.platformWidth = platformWidth;
+        this.tileProbability = tileProbability;
+        this.bgHue = bgHue;
+    }
+
+    generate() {
+        let colorBG = color.HSL.fromHexValue(0x2F3169);
+        colorBG.hue = this.bgHue;
+        let colorStars = color.HSL.fromHexValue(0x6B5394);
+        colorStars.hue = this.bgHue;
+
+        color.setColor(8, colorBG.hexValue());
+        color.setColor(11, colorStars.hexValue());
+
+        tilemapCurrent = tilemap`level`;
+        tiles.setTilemap(tilemapCurrent);
+
+        // Seed RNG with level id to get consistent generations
+        let rng = new Math.FastRandom(level);
+
+        // Redefine randint to use seeded rng
+        function randint(min: number, max: number) {
+            return Math.round(rng.randomRange(min, max));
+        }
+
+        function randomTile(tileProbability: Array<any>) {
+            let value = rng.randomRange(0, 100) / 100.0;
+            let total = 0;
+            for (let i = 0; i < tileProbability.length - 1; i++) {
+                let probability = tileProbability[i].probability;
+                if (probability + total >= value)
+                    return tileProbability[i].tile;
+                total += probability;
+            }
+            return tileProbability[tileProbability.length - 1].tile;
+        }
+
+        let y = tilemapCurrent.height - 4;
+        // We leave a roughly square area around the zapfish
+        while (y > tilemapCurrent.width) {
+            y -= randint(this.platformDistance[0], this.platformDistance[1]);
+            let x = randint(0, tilemapCurrent.width - 1);
+            let width = randint(this.platformWidth[0], this.platformWidth[1]);
+            let tile = randomTile(this.tileProbability);
+            for (let i = 0; i < width; i++) {
+                x = (x + 1) % tilemapCurrent.width;
+                let tileLocation = tiles.getTileLocation(x, y);
+                tiles.setTileAt(tileLocation, tile);
+                tiles.setWallAt(tileLocation, true);
+            }
+        }
+    }
+}
+
+let levelData = [
+    new Level( // 1
+        [4, 8],
+        [2, 6],
+        [
+            {
+                tile: assets.tile`ground`,
+                probability: 1
+            }
+        ],
+        238
+    ),
+    new Level( // 2
+        [6, 8],
+        [2, 3],
+        [
+            {
+                tile: assets.tile`ice`,
+                probability: 1
+            }
+        ],
+        220
+    )
+];
+
 function sfxBlowfish () {
     sfxJellyfish()
     timer.background(function () {
         music.playSoundEffect(music.createSoundEffect(WaveShape.Square, 208, 565, 255, 88, 500, SoundExpressionEffect.Vibrato, InterpolationCurve.Linear), SoundExpressionPlayMode.UntilDone)
     })
 }
-
-function sfxMiss() {
-    timer.background(function () {
-        music.playSoundEffect(music.createSoundEffect(WaveShape.Sawtooth, 90, 46, 255, 255, 100, SoundExpressionEffect.Vibrato,InterpolationCurve.Logarithmic), SoundExpressionPlayMode.UntilDone)
-        pause(50);
-        music.playSoundEffect(music.createSoundEffect(WaveShape.Sawtooth, 90, 46, 255, 255, 200, SoundExpressionEffect.Vibrato,InterpolationCurve.Logarithmic), SoundExpressionPlayMode.UntilDone)
-    })
+function repeatChar (count: number, ch: string) {
+    if (count == 0) {
+        return ""
+    }
+    count2 = count / 2
+    result = ch
+    while (result.length <= count2) {
+        result = "" + result + result
+    }
+    return "" + result + result[0, count - result.length - 1]
 }
-
+let result = ""
+let count2 = 0
+let tileset: Image[] = []
 let tilemapCurrent: tiles.TileMapData = null
+let hiscore = 0
+let score = 0
+let level = 1
+let lives = 2
+if (blockSettings.exists("hiscore")) {
+    hiscore = blockSettings.readNumber("hiscore")
+}
 class ForeverStopable {
     stopped = false;
 
@@ -48,7 +152,6 @@ class ForeverStopable {
 
     stop() { this.stopped = true; }
 }
-
 class Obj {
     stopped = false;
     loopRunner: ForeverStopable = null;
@@ -337,7 +440,6 @@ class ObjSquiddy extends Obj {
         this.sprite.destroy();
     }
 }
-
 class ObjMsgItem extends Obj{
     x = 0;
     y = 0;
@@ -364,7 +466,6 @@ class ObjMsgItem extends Obj{
         this._textSprite.destroy();
     }
 }
-
 class ObjMsg extends Obj {
     items: ObjMsgItem[] = [];
     pauseTime = 5000;
@@ -398,7 +499,6 @@ class ObjMsg extends Obj {
         this.items.forEach(item => item.destroy());
     }
 }
-
 class ObjMsgWin extends ObjMsg {
     stageBonus = 300;
     timeBonus = 0;
@@ -422,9 +522,9 @@ class ObjMsgWin extends ObjMsg {
                 timeBonusMax,
                 (
                     (
+                        (-this.time / 1000) +
                         timeBonusWidth +
-                        timeBonusStart -
-                        this.time
+                        timeBonusStart
                     ) / timeBonusWidth
                 ) * timeBonusMax
             )
@@ -457,7 +557,6 @@ class ObjMsgWin extends ObjMsg {
         gameMode = new ObjGameModeMain(tilemapCurrent);
     }
 }
-
 class ObjMsgGameOver extends ObjMsg {
     init() {
         this.pauseTime = 5000;
@@ -468,7 +567,6 @@ class ObjMsgGameOver extends ObjMsg {
 
     after() { game.reset(); }
 }
-
 class ObjMsgMiss extends ObjMsg {
     init() {
         this.pauseTime = 1800;
@@ -489,23 +587,6 @@ class ObjMsgMiss extends ObjMsg {
         gameMode = new ObjGameModeMain(tilemapCurrent);
     }
 }
-
-function repeatChar(count: number, ch: string) {
-    if (count == 0) {
-        return "";
-    }
-    let count2 = count / 2;
-    let result = ch;
-
-    // double the input until it is long enough.
-    while (result.length <= count2) {
-        result += result;
-    }
-    // use substring to hit the precise length target without
-    // using extra memory
-    return result + result[0, count - result.length - 1];
-}
-
 function rightJustify(text: any, length: number, char: string) {
     if (text == 0)
         return repeatChar(length, char)
@@ -514,7 +595,6 @@ function rightJustify(text: any, length: number, char: string) {
     let padding = repeatChar(paddingLength, char);
     return padding + convertToText(text);
 }
-
 class ObjHUD extends Obj {
     _bgSprite: Sprite = null;
     _timerSprite: TextSprite = null;
@@ -585,7 +665,6 @@ class ObjHUD extends Obj {
         this._livesSprites.forEach(x => x.destroy());
     }
 }
-
 let tilemapCurrentName = "level"
 class ObjGameModeMain extends Obj {
     squiddy: ObjSquiddy = null;
@@ -595,8 +674,7 @@ class ObjGameModeMain extends Obj {
     constructor(tilemap: tiles.TileMapData) {
         super();
         
-        tilemapCurrent = helpers.getTilemapByName(tilemapCurrentName);
-        tiles.setCurrentTilemap(tilemapCurrent);
+        levelData[level-1].generate();
         scene.setBackgroundColor(8);
         scroller.setLayerImage(
             scroller.BackgroundLayer.Layer0,
@@ -633,4 +711,41 @@ class ObjGameModeMain extends Obj {
         this.water.destroy();
     }
 }
+/*
+    Order is:
+    0: ?
+    1: white
+    2: red (blowfish)
+    3: pink (charging)
+    4: light orange (ground)
+    5: yellow (charging)
+    6: dark sky blue
+    7: ?
+    8: dark purple (bg)
+    9: light sky blue (ice, jellyfish)
+    10: purple (water)
+    11: stars
+    12: grey (eyes)
+    13: ?
+    14: brown (ground)
+    15: black
+*/
+color.setPalette(color.bufferToPalette(hex`
+    000000
+    FFFFFF
+    FF1856
+    FF98B4
+    ffb293
+    FFFF00
+    38a3cd
+    000000
+    2F3169
+    9bddff
+    7C169E
+    6B5394
+    555555
+    000000
+    87513C
+    000000
+`))
 let gameMode = new ObjGameModeMain(assets.tilemap`level`);
