@@ -127,9 +127,12 @@ class ObjSquiddy extends Obj {
     defaultImg = assets.animation`squid`[0];
     sprite: Sprite = null;
     timeJumpStart = 0;
+    timeStart = 0;
 
     constructor() {
         super();
+
+        this.timeStart = game.runtime();
 
         this.sprite = sprites.create(this.defaultImg, SpriteKind.Player);
         this.sprite.setStayInScreen(false);
@@ -157,6 +160,10 @@ class ObjSquiddy extends Obj {
                 new ObjMsgMiss();
             }
         );
+    }
+
+    time() {
+        return game.runtime() - this.timeStart;
     }
 
     startJump() {
@@ -295,8 +302,10 @@ class ObjSquiddy extends Obj {
 
         let squiddyAcc = 100;
         if (this.sprite.isHittingTile(CollisionDirection.Bottom)) {
-            this.sprite.ax = 0;
-            this.sprite.vx = 0;
+            if (!this.sprite.tileKindAt(TileDirection.Bottom, assets.tile`ice`)) {
+                this.sprite.ax = 0;
+                this.sprite.vx = 0;
+            }
             this.airJumpCount = 0;
         } if (controller.left.isPressed())
             this.sprite.ax = -squiddyAcc;
@@ -377,7 +386,6 @@ class ObjMsg extends Obj {
     }
 }
 
-
 class ObjMsgWin extends ObjMsg {
     init() {
         this.pauseTime = 5000;
@@ -410,10 +418,65 @@ class ObjMsgMiss extends ObjMsg {
     }
 }
 
+function repeatChar(count: number, ch: string) {
+    if (count == 0) {
+        return "";
+    }
+    let count2 = count / 2;
+    let result = ch;
+
+    // double the input until it is long enough.
+    while (result.length <= count2) {
+        result += result;
+    }
+    // use substring to hit the precise length target without
+    // using extra memory
+    return result + result[0, count - result.length - 1];
+}
+
+function rightJustify(text: any, length: number, char: string) {
+    let paddingLength = length - convertToText(text).length;
+    let padding = repeatChar(paddingLength, char);
+    return padding + text;
+}
+
+class ObjHUD extends Obj {
+    _bgSprite: Sprite = null;
+    _timerSprite: TextSprite = null;
+    sprites: Sprite[] = null;
+    player: ObjSquiddy = null;
+
+    constructor(player: ObjSquiddy) {
+        super();
+        this.player = player;
+        this._bgSprite = sprites.create(assets.image`hudBg`, SpriteKind.Text);
+        this._bgSprite.setFlag(SpriteFlag.RelativeToCamera, true);
+
+        this._timerSprite = textsprite.create("00:00:00", 0, 1);
+        this._timerSprite.setFlag(SpriteFlag.RelativeToCamera, true);
+        this._timerSprite.x = 136;
+        this._timerSprite.y = 116;
+    }
+
+    loop() {
+        let time = this.player.time();
+        let minutes = Math.floor(time / (60 * 1000));
+        let seconds = Math.floor(time / 1000) % 60;
+        let centiseconds = Math.floor((time % 1000) / 10);
+        let timerText = (
+            rightJustify(minutes, 2, "0") + ":" +
+            rightJustify(seconds, 2, "0") + ":" +
+            rightJustify(centiseconds, 2, "0")
+        );
+        this._timerSprite.setText(timerText);
+    }
+}
+
 let tilemapCurrentName = "level"
 class ObjGameModeMain extends Obj {
     squiddy: ObjSquiddy = null;
     water: ObjWater = null;
+    hud: ObjHUD = null;
 
     constructor(tilemap: tiles.TileMapData) {
         super();
@@ -423,6 +486,7 @@ class ObjGameModeMain extends Obj {
         scene.setBackgroundImage(assets.image`bg`);
         this.squiddy = new ObjSquiddy();
         this.water = new ObjWater();
+        this.hud = new ObjHUD(this.squiddy);
     }
 
     getBGPos() {
